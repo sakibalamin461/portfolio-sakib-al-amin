@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import HomeLink from "./HomeLink";
 
 type Props = { name: string; role: string; timezone: string; availability?: string | null };
 
@@ -47,7 +48,7 @@ export default function StatusBar({ name, role, timezone, availability }: Props)
   return (
     <div className="instrument label fixed inset-x-[var(--gutter)] top-[var(--gutter)] z-50 hidden h-[var(--hud-height)] items-center justify-between gap-4 px-3.5 md:flex">
       <span className="truncate">
-        <span className="text-muted-dark">{name}</span>
+        <HomeLink className="-mx-1 rounded-xs px-1 py-1.5 text-muted-dark transition-colors hover:text-on-ink">{name}</HomeLink>
         <span className="ml-6">{context}</span>
       </span>
       <span aria-label="Local time" className="tabular-nums">

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { SiteSettings } from "@/lib/types";
+import HomeLink from "./HomeLink";
 import Menu from "./Menu";
 import StatusBar from "./StatusBar";
 import TopChips from "./TopChips";
@@ -26,13 +26,12 @@ export default function Frame({ settings }: { settings: SiteSettings }) {
         availability={availability}
       />
 
-      <Link
-        href="/"
+      <HomeLink
         aria-label={`${settings.name}, home`}
         className="instrument fixed bottom-[var(--gutter)] left-[var(--gutter)] z-50 grid h-12 w-12 place-items-center font-mono text-[13px] font-bold md:h-14 md:w-14 md:text-[15px]"
       >
         {settings.monogram}
-      </Link>
+      </HomeLink>
 
       {settings.bookingUrl && (
         <a

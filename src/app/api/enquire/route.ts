@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await client.create({ _type: "enquiry", ...enquiry, receivedAt: new Date().toISOString() });
+    await client.create({ _type: "enquiry", status: "new", ...enquiry, receivedAt: new Date().toISOString() });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[enquire] could not save enquiry", error);
