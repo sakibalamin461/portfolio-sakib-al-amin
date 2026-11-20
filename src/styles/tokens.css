@@ -64,13 +64,20 @@
   --chip-height: 40px;
   --frame-bottom: 72px; /* space reserved for the bottom controls */
 
-  /* Home strip — unitless vw so motion code can read them.
-   * Three cards fill the width edge to edge: side + gap + centre + gap + side = 100. */
-  --strip-center-w: 37;
-  --strip-center-h: 21.2;
-  --strip-side-h: 18.7;
-  --strip-gap: 2.55;
-  --strip-interval: 4.5; /* seconds between auto-advances */
+  /* Home work strip (WebGL cards) — unitless numbers so the strip code can read them.
+   * Sizes come from a column grid: an inactive card is 1 column wide, the open card spans
+   * --strip-active-cols. Card centres sit one column + --strip-spacing px apart. */
+  --strip-margin: 36; /* px */
+  --strip-gutter: 10; /* px */
+  --strip-cols: 12;
+  --strip-active-cols: 6;
+  --strip-spacing: 24; /* px added between card slots */
+  --strip-height: 55; /* vh */
+  --strip-open: 1.25; /* s — width change when a card opens or closes */
+  --strip-reveal: 1.45; /* s — image reveal (noisy circle) after a card opens */
+  --strip-reveal-delay: 0.45; /* s */
+  --strip-dissolve: 1.05; /* s — image melting back into the marble on close */
+  --strip-glide: 1.05; /* s — how long scrolling/dragging takes to settle */
 
   /* Home statement panel */
   --panel-width: 35.5vw;
@@ -106,10 +113,11 @@
   :root {
     --gutter: 12px;
     --frame-bottom: 72px;
-    --strip-center-w: 74;
-    --strip-center-h: 52;
-    --strip-side-h: 44;
-    --strip-gap: 3;
+    --strip-margin: 18;
+    --strip-cols: 6;
+    --strip-active-cols: 4;
+    --strip-spacing: 12;
+    --strip-height: 46;
     --scene-margin: 20px;
     --hero-size: 15.5vw;
     --hero-l1: 0;

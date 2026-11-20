@@ -11,13 +11,18 @@ type Props = {
   priority?: boolean;
   /** Full film with controls and sound instead of a muted loop. */
   controls?: boolean;
+  /**
+   * For places that repeat many cards (the work grid): prefer the still
+   * image; a video-only cover shows its first frame and plays on hover.
+   */
+  still?: boolean;
   label?: string;
 };
 
 /** Renders a muted video loop, an image, or the placeholder swatch, in that order. */
-export default function Media({ media, className = "", sizes = "50vw", priority, controls, label }: Props) {
+export default function Media({ media, className = "", sizes = "50vw", priority, controls, still, label }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const videoUrl = media?.videoUrl;
+  const videoUrl = still && media?.imageUrl ? null : media?.videoUrl;
 
   // HLS streams: Safari plays them natively, everything else needs hls.js.
   useEffect(() => {
@@ -37,19 +42,24 @@ export default function Media({ media, className = "", sizes = "50vw", priority,
   // Loops only play while on screen.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || controls) return;
+    if (!video || controls || still) return;
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) video.play().catch(() => {});
       else video.pause();
     });
     observer.observe(video);
     return () => observer.disconnect();
-  }, [controls, videoUrl]);
+  }, [controls, still, videoUrl]);
 
   const isHls = videoUrl?.includes(".m3u8");
+  const hoverPlay = still && videoUrl ? {
+    onPointerEnter: () => videoRef.current?.play().catch(() => {}),
+    onPointerLeave: () => videoRef.current?.pause(),
+  } : {};
 
   return (
     <div
+      {...hoverPlay}
       className={`relative overflow-hidden ${className}`}
       style={{ background: media?.swatch || "var(--color-canvas-2)" }}
       role={label && !videoUrl && !media?.imageUrl ? "img" : undefined}
@@ -59,7 +69,7 @@ export default function Media({ media, className = "", sizes = "50vw", priority,
         <video
           ref={videoRef}
           className="absolute inset-0 h-full w-full object-cover"
-          src={isHls ? undefined : videoUrl}
+          src={isHls ? undefined : still ? `${videoUrl}#t=0.1` : videoUrl}
           poster={media?.imageUrl || undefined}
           muted={!controls}
           loop={!controls}

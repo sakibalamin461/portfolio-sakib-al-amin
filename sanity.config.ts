@@ -14,8 +14,9 @@ export default defineConfig({
   dataset,
   schema: {
     types: schemaTypes,
-    // Singletons can't be created from "New document" or duplicated.
-    templates: (templates) => templates.filter(({ schemaType }) => !singletonTypes.has(schemaType)),
+    // Singletons can't be created from "New document" or duplicated, and
+    // messages only ever come from the website's contact form.
+    templates: (templates) => templates.filter(({ schemaType }) => !singletonTypes.has(schemaType) && schemaType !== "enquiry"),
   },
   document: {
     actions: (actions, { schemaType }) =>
@@ -23,5 +24,6 @@ export default defineConfig({
         ? actions.filter(({ action }) => action && ["publish", "discardChanges", "restore"].includes(action))
         : actions,
   },
-  plugins: [structureTool({ structure }), visionTool({ defaultApiVersion: apiVersion })],
+  // Vision (the GROQ query console) is a developer tool: local development only.
+  plugins: [structureTool({ structure }), ...(process.env.NODE_ENV === "development" ? [visionTool({ defaultApiVersion: apiVersion })] : [])],
 });

@@ -38,34 +38,38 @@ const WORDS = [
 type Opening =
   | null
   | { hero: true; w: number; h: number; x0: number; x1: number; y0: number; y1: number }
-  | { hero: false; corner: [number, number]; start: number };
+  | { hero: false; w: number; h: number; corner: [number, number]; start: number };
+
+/** Visible part of a card, as insets in px: top, right, bottom, left. */
+type Inset = [number, number, number, number];
 
 /**
- * The visible part of a card at progress q, as a clip-path.
- * "" = fully open, null = not open yet (hidden).
+ * The visible part of a card at progress q.
+ * "open" = fully open, null = not open yet (hidden), otherwise insets in px.
  * The hero card first fills the box the middle name line leaves behind, like
  * a curtain, then grows from that box to its full frame. The others open
  * diagonally from a corner once the hero is in place.
  */
-function clipFor(o: Opening, q: number): string | null {
-  if (!o) return "";
+function clipFor(o: Opening, q: number): Inset | "open" | null {
+  if (!o) return "open";
   if (o.hero) {
     const fill = ease(0.2, 0.28, q);
     const grow = ease(0.3, 0.48, q);
     if (fill <= 0) return null;
-    if (grow >= 1) return "";
+    if (grow >= 1) return "open";
     const x0 = o.x0 * (1 - grow);
     const x1 = o.x1 + (o.w - o.x1) * grow;
     const y0 = o.y0 * (1 - grow);
     const y1 = o.y0 + (o.y1 - o.y0) * fill + (o.h - o.y1) * grow;
-    return `inset(${y0.toFixed(2)}px ${(o.w - x1).toFixed(2)}px ${(o.h - y1).toFixed(2)}px ${x0.toFixed(2)}px)`;
+    return [y0, o.w - x1, o.h - y1, x0];
   }
   const u = ease(o.start, o.start + 0.2, q);
-  if (u >= 1) return "";
+  if (u >= 1) return "open";
   if (u <= 0) return null;
-  const r = (1 - u) * 100;
+  const rx = (1 - u) * o.w;
+  const ry = (1 - u) * o.h;
   const [cx, cy] = o.corner;
-  return `inset(${cy ? r : 0}% ${cx === 0 ? r : 0}% ${cy ? 0 : r}% ${cx ? r : 0}%)`;
+  return [cy ? ry : 0, cx === 0 ? rx : 0, cy ? 0 : ry, cx ? rx : 0];
 }
 
 const corner = (): [number, number] => [Math.random() < 0.5 ? 0 : 1, Math.random() < 0.5 ? 0 : 1];
@@ -101,7 +105,8 @@ export default function HomeScene({ name, role, lines, facts, availability, port
     const plan = $("[data-plan]");
     const guides = $("[data-guides]");
     const panel = $("[data-panel]");
-    const cards = $$("[data-card]");
+    // The work strip creates its cards itself, so read them fresh on each measure.
+    let cards = $$("[data-card]");
     const reduced = prefersReducedMotion();
 
     let openings: Opening[] = [];
@@ -111,6 +116,7 @@ export default function HomeScene({ name, role, lines, facts, availability, port
     const measure = () => {
       const vw = window.innerWidth;
       const block = masks[1]?.getBoundingClientRect();
+      cards = $$("[data-card]");
       const rects = cards.map((el) => (el.style.visibility === "hidden" ? null : el.getBoundingClientRect()));
       let hero = -1;
       let best = 0;
@@ -149,7 +155,7 @@ export default function HomeScene({ name, role, lines, facts, availability, port
             y1: clamp(block.bottom - c.top, 0, c.height),
           };
         }
-        return { hero: false, corner: corner(), start: c.left + c.width / 2 < centre ? 0.4 : 0.46 };
+        return { hero: false, w: c.width, h: c.height, corner: corner(), start: c.left + c.width / 2 < centre ? 0.4 : 0.46 };
       });
 
       const cell = (document.documentElement.clientWidth - 2 * parseFloat(getComputedStyle(stage).getPropertyValue("--scene-margin"))) / 12;
@@ -169,11 +175,21 @@ export default function HomeScene({ name, role, lines, facts, availability, port
       if (plan) plan.style.opacity = (1 - ease(0.3, 0.75, q)).toFixed(3);
       if (guides) guides.style.clipPath = `inset(${((1 - ease(0.45, 0.85, q)) * 100).toFixed(2)}% 0 0 0)`;
 
+      // The strip draws the cards in WebGL and reads the clip from data-clip;
+      // the CSS clip keeps the clickable area matching what's drawn.
       cards.forEach((el, k) => {
         const clip = clipFor(openings[k] ?? null, q);
-        el.style.clipPath = clip || "";
-        el.style.opacity = clip === null ? "0" : "";
-        el.style.pointerEvents = clip === "" ? "" : "none";
+        if (clip === "open") {
+          el.style.clipPath = "";
+          delete el.dataset.clip;
+        } else if (clip === null) {
+          el.style.clipPath = "inset(50%)";
+          el.dataset.clip = "hidden";
+        } else {
+          el.style.clipPath = `inset(${clip.map((v) => `${v.toFixed(2)}px`).join(" ")})`;
+          el.dataset.clip = clip.map((v) => v.toFixed(2)).join(" ");
+        }
+        el.style.pointerEvents = clip === "open" ? "" : "none";
       });
 
       if (panel) {

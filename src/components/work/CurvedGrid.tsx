@@ -73,20 +73,39 @@ export default function CurvedGrid({ projects }: { projects: ProjectSummary[] })
 
     const target = { x: 0, y: 0 };
     const current = { x: 0, y: 0 };
+    const cols = els.map((el) => Number(el.dataset.col));
+    const rowsOf = els.map((el) => Number(el.dataset.row));
+    const shown = els.map(() => true);
+    let dirty = true;
+    const TAU = 0.075; // seconds to cover ~63% of the remaining distance: snappy but still smooth
 
     const render = () => {
-      current.x += (target.x - current.x) * (reduced ? 1 : 0.09);
-      current.y += (target.y - current.y) * (reduced ? 1 : 0.09);
+      const dx = target.x - current.x;
+      const dy = target.y - current.y;
+      // Nothing moving: skip the frame entirely.
+      if (!dirty && Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
+      dirty = false;
+      // Time-based easing, so it feels the same at 60, 120 or 144 Hz.
+      const k = reduced ? 1 : 1 - Math.exp(-gsap.ticker.deltaRatio(60) / 60 / TAU);
+      current.x += dx * k;
+      current.y += dy * k;
+      const halfW = stage.clientWidth / 2 + cardW;
+      const halfH = stage.clientHeight / 2 + cardH;
       const wrapX = gsap.utils.wrap(-spanX / 2, spanX / 2);
       const wrapY = gsap.utils.wrap(-spanY / 2, spanY / 2);
-      els.forEach((el) => {
-        const col = Number(el.dataset.col);
-        const row = Number(el.dataset.row);
-        const x = wrapX(col * cellW - spanX / 2 + cellW / 2 + current.x);
-        const y = wrapY(row * cellH - spanY / 2 + cellH / 2 + current.y);
+      for (let i = 0; i < els.length; i++) {
+        const x = wrapX(cols[i] * cellW - spanX / 2 + cellW / 2 + current.x);
+        const y = wrapY(rowsOf[i] * cellH - spanY / 2 + cellH / 2 + current.y);
+        // Cards well off screen are hidden, so the GPU only composites what's visible.
+        const visible = Math.abs(x) < halfW && Math.abs(y) < halfH;
+        if (visible !== shown[i]) {
+          els[i].style.visibility = visible ? "" : "hidden";
+          shown[i] = visible;
+        }
+        if (!visible) continue;
         const z = (x * x + y * y) / (2 * radius);
-        el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${-x / radius}rad) rotateX(${y / radius}rad)`;
-      });
+        els[i].style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-x / radius).toFixed(4)}rad) rotateX(${(y / radius).toFixed(4)}rad)`;
+      }
     };
     gsap.ticker.add(render);
 
@@ -104,15 +123,18 @@ export default function CurvedGrid({ projects }: { projects: ProjectSummary[] })
       const dy = e.clientY - drag.y;
       drag = { x: e.clientX, y: e.clientY };
       moved += Math.abs(dx) + Math.abs(dy);
-      target.x += dx * 1.4;
-      target.y += dy * 1.4;
+      // Once it's clearly a drag (not a click), keep it even if the pointer leaves the window.
+      if (moved > 6 && !stage.hasPointerCapture(e.pointerId)) stage.setPointerCapture(e.pointerId);
+      target.x += dx * 1.2;
+      target.y += dy * 1.2;
       vel = { x: dx, y: dy };
     };
     const onUp = () => {
       if (!drag) return;
       drag = null;
-      target.x += vel.x * 12;
-      target.y += vel.y * 12;
+      // A short glide after release, proportional to the last movement.
+      target.x += vel.x * 8;
+      target.y += vel.y * 8;
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -133,23 +155,30 @@ export default function CurvedGrid({ projects }: { projects: ProjectSummary[] })
       }
     };
 
+    const onResize = () => {
+      measure();
+      dirty = true;
+    };
+
     stage.addEventListener("pointerdown", onDown);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    stage.addEventListener("pointermove", onMove);
+    stage.addEventListener("pointerup", onUp);
+    stage.addEventListener("pointercancel", onUp);
     stage.addEventListener("wheel", onWheel, { passive: false });
     stage.addEventListener("keydown", onKey);
     stage.addEventListener("click", onClick, true);
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", onResize);
 
     return () => {
       gsap.ticker.remove(render);
       stage.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      stage.removeEventListener("pointermove", onMove);
+      stage.removeEventListener("pointerup", onUp);
+      stage.removeEventListener("pointercancel", onUp);
       stage.removeEventListener("wheel", onWheel);
       stage.removeEventListener("keydown", onKey);
       stage.removeEventListener("click", onClick, true);
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
     };
   }, [copies, rows, projects]);
 
@@ -166,7 +195,7 @@ export default function CurvedGrid({ projects }: { projects: ProjectSummary[] })
         {cells.map(({ project, col, row, primary, key }) => (
           <li key={key} data-cell data-col={col} data-row={row} aria-hidden={!primary || undefined} className="group absolute left-0 top-0 will-change-transform">
             <Link href={`/work/${project.slug}`} tabIndex={primary ? undefined : -1} draggable={false} className="block">
-              <Media media={project.cover} label={project.title} className="aspect-[16/10] rounded-sm" sizes="340px" />
+              <Media media={project.cover} label={project.title} still className="aspect-[16/10] rounded-sm" sizes="340px" />
               <span className="label mt-2 flex justify-between gap-3 text-muted">
                 <span>{project.code}</span>
                 <span className="truncate opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">{project.title}</span>
